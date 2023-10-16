@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, SectionList } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, ListRenderItem } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../provider/AuthProvider';
 import { supabase } from '../../config/initSupabase';
 import BottomGrocerySheet from '../../components/BottomGrocerySheet';
+import { Ionicons } from '@expo/vector-icons';
 
 const Page = () => {
   const [listItems, setListItems] = useState<any[]>([]);
@@ -30,7 +31,6 @@ const Page = () => {
         // remove duplicate names
         const combinedHistoric = [...historic.map((item: any) => item.name), ...groceryOptions];
         const uniqueHistoric = [...new Set(combinedHistoric)];
-        console.log("🚀 ~ file: index.tsx:28 ~ fetchData ~ uniqueHistoric:", uniqueHistoric);
         setGroceryOptions(uniqueHistoric);
       }
 
@@ -40,7 +40,6 @@ const Page = () => {
           const items = products.filter((product: any) => product.category === category.id);
           return { ...category, data: items };
         });
-        console.log("🚀 ~ file: index.tsx:42 ~ constgrouped:any=categories?.map ~ grouped:", grouped)
 
         setListItems(grouped);
       }
@@ -50,7 +49,43 @@ const Page = () => {
 
   // Add item to shopping list
   const onAddItem = async (name: string, categoryId: number) => {
-    console.log('ITEM ADDED: ', name);
+    const result = await supabase
+      .from('products')
+      .insert([{ name, category: categoryId, user_id: user?.id }])
+      .select()
+
+    // Add item to state
+    if (result.data) {
+      const category = listItems.find((category) => category.id === categoryId);
+      if (category) {
+        category.data.push(result.data[0]);
+        setListItems((prev) => [...prev]);
+      }
+    }
+  };
+
+  // Shopping List Item Row
+  const renderGroceryRow: ListRenderItem<any> = ({ item }) => {
+    const onSelect = async (grocery: any) => {
+      // Remove item by setting historic to true
+      await supabase.from('products').update({ historic: true }).eq('id', grocery.id);
+
+      // Remove item from state
+      const category = listItems.find((category) => category.id === grocery.category);
+      if (category) {
+        category.data = category.data.filter((item: any) => item.id !== grocery.id);
+        setListItems((prev) => [...prev]);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        onPress={() => onSelect(item)}
+        style={[styles.groceryRow, { backgroundColor: '#0c3824' }]}>
+        <Text style={styles.groceryName}>{item.name}</Text>
+        <Ionicons name="checkmark" size={24} color="white" />
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -60,6 +95,8 @@ const Page = () => {
           renderSectionHeader={({ section: { category } }) => <Text style={styles.sectionHeader}>{category}</Text>}
           contentContainerStyle={{ paddingBottom: 150 }}
           sections={listItems}
+          renderItem={renderGroceryRow}
+          stickySectionHeadersEnabled={false}
         />
       )}
 

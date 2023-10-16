@@ -43,6 +43,11 @@ create policy "Categories are viewable by everyone."
   to authenticated
   using ( true );
 
+create policy "Users can update their own products"
+  on products for update
+  to public
+  using ( auth.uid() = user_id );
+
 /**
 * Function to compare embeddings
 */
